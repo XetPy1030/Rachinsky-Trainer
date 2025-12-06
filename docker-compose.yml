@@ -6,6 +6,9 @@ services:
     restart: unless-stopped
     environment:
       - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - LOG_FILE=/app/logs/bot.log
     volumes:
       - logs_data:/app/logs
