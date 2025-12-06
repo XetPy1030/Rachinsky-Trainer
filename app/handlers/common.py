@@ -20,7 +20,7 @@ def _commands_hint() -> str:
         "/task номер — задача по номеру (пример: /task 42)\n"
         "/task_random — случайная задача\n"
         "/task_stats — моя статистика\n"
-        "/task_top — глобальный топ\n"
+        "/task_top — топ за сегодня и глобальный\n"
         "/task_info номер — статистика по задаче (пример: /task_info 42)\n"
         "/help — показать помощь"
     )
@@ -29,11 +29,12 @@ def _commands_hint() -> str:
 @router.message(CommandStart())
 async def start_handler(message: Message, user: User):
     """Обработчик команды /start"""
-    stats = await TaskProgressService.get_user_stats(user)
+    today = await TaskProgressService.get_user_today_counts(user)
+    accuracy = round((today['correct'] / today['total']) * 100, 1) if today['total'] else 0.0
 
     welcome_text = (
         "Привет! Я бот для решения задач из списка, можешь решать по порядку, по номеру или брать случайные.\n\n"
-        f"За сегодняшний день: верно {stats['correct']} из {stats['total']} (точность {stats['accuracy']}%).\n\n"
+        f"За сегодня: верно {today['correct']} из {today['total']} (точность {accuracy}%).\n\n"
         f"{_commands_hint()}"
     )
 

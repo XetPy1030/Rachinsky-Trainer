@@ -15,7 +15,7 @@ async def set_bot_commands() -> None:
         BotCommand(command="task", description="Задача по номеру /task 42"),
         BotCommand(command="task_random", description="Случайная задача"),
         BotCommand(command="task_stats", description="Моя статистика"),
-        BotCommand(command="task_top", description="Глобальный топ"),
+        BotCommand(command="task_top", description="Топ за сегодня и глобальный"),
         BotCommand(command="task_info", description="Статистика по задаче /task_info 42"),
     ]
     await bot.set_my_commands(commands)

@@ -139,6 +139,40 @@ class TaskProgressService:
         return leaderboard
 
     @staticmethod
+    async def get_leaderboard_today(limit: int = 10) -> List[dict]:
+        """Топ за сегодняшний день по числу верных задач"""
+        now_local = get_current_dt().astimezone(current_timezone)
+        start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_utc = start_local.astimezone(UTC)
+
+        rows = (
+            await TaskAttempt.filter(
+                status=TaskProgressService.STATUS_CORRECT,
+                created_at__gte=start_utc
+            )
+            .annotate(correct_count=Count("id"))
+            .group_by("user_id")
+            .order_by("-correct_count")
+            .limit(limit)
+            .values("user_id", "correct_count")
+        )
+        user_ids = [row["user_id"] for row in rows]
+        users = await User.filter(id__in=user_ids)
+        users_map = {u.id: u for u in users}
+
+        leaderboard = []
+        for idx, row in enumerate(rows, start=1):
+            user = users_map.get(row["user_id"])
+            leaderboard.append(
+                {
+                    "place": idx,
+                    "user": user,
+                    "correct": row["correct_count"],
+                }
+            )
+        return leaderboard
+
+    @staticmethod
     async def get_task_stats(task_number: int) -> dict:
         """Статистика по конкретной задаче"""
         total = await TaskAttempt.filter(task_number=task_number).count()

@@ -132,22 +132,35 @@ async def task_stats(message: Message, user: User):
 
 @router.message(Command("task_top"))
 async def task_top(message: Message):
-    """Глобальный топ по верным задачам"""
-    leaders = await TaskProgressService.get_leaderboard()
-    if not leaders:
-        await message.answer("Пока нет решённых задач.")
-        return
+    """Топы: за сегодня и за всё время"""
+    leaders_today = await TaskProgressService.get_leaderboard_today()
+    leaders_all = await TaskProgressService.get_leaderboard()
 
-    lines = ["Глобальный топ:"]
-    for row in leaders:
-        user = row["user"]
-        if user:
-            name = user.full_name or user.username or f"ID {user.telegram_id}"
-        else:
-            name = "неизвестно"
-        lines.append(f"{row['place']}. {name} — {row['correct']} верных")
+    parts = []
 
-    await message.answer("\n".join(lines))
+    # Топ за сегодня
+    if leaders_today:
+        lines = ["🏆 Топ за сегодня:"]
+        for row in leaders_today:
+            user = row["user"]
+            name = user.full_name or user.username or f"ID {user.telegram_id}" if user else "неизвестно"
+            lines.append(f"{row['place']}. {name} — {row['correct']} верных")
+        parts.append("\n".join(lines))
+    else:
+        parts.append("🏆 Топ за сегодня:\nПока никто не решил ни одной задачи.")
+
+    # Глобальный топ
+    if leaders_all:
+        lines = ["🌍 Глобальный топ:"]
+        for row in leaders_all:
+            user = row["user"]
+            name = user.full_name or user.username or f"ID {user.telegram_id}" if user else "неизвестно"
+            lines.append(f"{row['place']}. {name} — {row['correct']} верных")
+        parts.append("\n".join(lines))
+    else:
+        parts.append("🌍 Глобальный топ:\nПока нет решённых задач.")
+
+    await message.answer("\n\n".join(parts))
 
 
 @router.message(Command("task_info"))
