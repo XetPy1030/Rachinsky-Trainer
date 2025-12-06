@@ -2,16 +2,18 @@
 YouTube Downloader Bot
 Главный файл для запуска бота
 """
-import asyncio
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
+import asyncio
+
 from tortoise import Tortoise
 
 from app.config import tortoise_config
 from app.instances import dp, bot
 from app.utils.logger import setup_logger, get_logger
-
-load_dotenv()
 
 setup_logger()
 logger = get_logger(__name__)
