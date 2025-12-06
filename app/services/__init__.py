@@ -1,8 +1,8 @@
-from .tasks import TaskService, Task
-from .notifiers import notify_about_startup
-from .user import UserService
-from .task_progress import TaskProgressService
 from .commands import set_bot_commands
+from .notifiers import notify_about_startup
+from .task_progress import TaskProgressService
+from .tasks import TaskService, Task
+from .user import UserService
 
 __all__ = [
     "Task",
