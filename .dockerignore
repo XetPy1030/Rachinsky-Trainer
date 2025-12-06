@@ -41,7 +41,7 @@ env/
 ENV/
 
 # Environment files
-.env
+#.env
 .env.local
 .env.*.local
 
