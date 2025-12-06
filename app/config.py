@@ -1,6 +1,8 @@
 """
 Настройки приложения
 """
+from pathlib import Path
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -101,3 +103,5 @@ tortoise_config = {
     "use_tz": True,
     "timezone": "UTC"
 }
+
+app_path = Path(__file__).parent.parent
