@@ -2,6 +2,7 @@
 Хендлеры для решения задач
 """
 import re
+from decimal import Decimal, InvalidOperation
 
 from aiogram import Router, F
 from aiogram.filters import Command
@@ -22,16 +23,31 @@ class TaskSolveState(StatesGroup):
 
 
 def _normalize_answer(text: str) -> str:
-    """Упрощённая нормализация ответа для сравнения"""
-    cleaned = re.sub(r"[^\w\s.,-]", "", text.strip().lower())
-    cleaned = re.sub(r"\s+", " ", cleaned)
-    return cleaned.strip()
+    """Гибкая нормализация: регистр, пробелы, знаки, числа с . или ,"""
+    if not text:
+        return ""
+
+    lowered = text.strip().lower().replace(",", ".")
+    cleaned = re.sub(r"[^\w\s.\-]", " ", lowered)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    numeric_candidate = cleaned.replace(" ", "")
+    try:
+        dec = Decimal(numeric_candidate)
+        dec = dec.normalize()
+        normalized_num = format(dec, "f").rstrip("0").rstrip(".")
+        return normalized_num
+    except InvalidOperation:
+        return cleaned
 
 
 def _task_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⏭️ Скип", callback_data="task_skip")],
+            [
+                InlineKeyboardButton(text="⏭️ Скип", callback_data="task_skip"),
+                InlineKeyboardButton(text="👀 Показать ответ", callback_data="task_show_answer"),
+            ],
         ]
     )
 
@@ -44,7 +60,7 @@ async def _send_task(target_message: Message, state: FSMContext, task: Task) -> 
     text = (
         f"Задача #{task.number}\n"
         f"{task.description}\n\n"
-        "Отправь ответ сообщением или нажми «Скип»."
+        "Отправь ответ сообщением, нажми «Показать ответ» или «Скип»."
     )
     await target_message.answer(text, reply_markup=_task_keyboard())
 
@@ -97,6 +113,66 @@ async def task_random(message: Message, state: FSMContext, user: User):
         return
 
     await _send_task(message, state, task)
+
+
+@router.message(Command("task_stats"))
+async def task_stats(message: Message, user: User):
+    """Персональная статистика"""
+    stats = await TaskProgressService.get_user_stats(user)
+    text = (
+        "Твоя статистика:\n"
+        f"Всего попыток: {stats['total']}\n"
+        f"Верно: {stats['correct']}\n"
+        f"Неверно: {stats['incorrect']}\n"
+        f"Скип: {stats['skipped']}\n"
+        f"Точность: {stats['accuracy']}%"
+    )
+    await message.answer(text)
+
+
+@router.message(Command("task_top"))
+async def task_top(message: Message):
+    """Глобальный топ по верным задачам"""
+    leaders = await TaskProgressService.get_leaderboard()
+    if not leaders:
+        await message.answer("Пока нет решённых задач.")
+        return
+
+    lines = ["Глобальный топ:"]
+    for row in leaders:
+        user = row["user"]
+        if user:
+            name = user.full_name or user.username or f"ID {user.telegram_id}"
+        else:
+            name = "неизвестно"
+        lines.append(f"{row['place']}. {name} — {row['correct']} верных")
+
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("task_info"))
+async def task_info(message: Message):
+    """Статистика по задаче"""
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip().isdigit():
+        await message.answer("Укажи номер: /task_info 42")
+        return
+
+    number = int(parts[1].strip())
+    stats = await TaskProgressService.get_task_stats(number)
+    if stats["total"] == 0:
+        await message.answer("По этой задаче пока нет попыток.")
+        return
+
+    text = (
+        f"Статистика по задаче #{number}:\n"
+        f"Всего попыток: {stats['total']}\n"
+        f"Верно: {stats['correct']}\n"
+        f"Неверно: {stats['incorrect']}\n"
+        f"Скип: {stats['skipped']}\n"
+        f"Точность: {stats['accuracy']}%"
+    )
+    await message.answer(text)
 
 
 @router.message(TaskSolveState.waiting_answer)
@@ -173,6 +249,43 @@ async def skip_task(callback: CallbackQuery, state: FSMContext, user: User):
 
     await callback.answer("Пропущена")
     await callback.message.answer(f"Задача #{task.number} пропущена.")
+
+    next_task = _get_next_task(task.number)
+    if not next_task:
+        await callback.message.answer("Больше задач нет. Возвращайся позже.")
+        await state.clear()
+        return
+
+    await _send_task(callback.message, state, next_task)
+
+
+@router.callback_query(TaskSolveState.waiting_answer, F.data == "task_show_answer")
+async def show_answer(callback: CallbackQuery, state: FSMContext, user: User):
+    """Показать ответ и перейти дальше (считается как неверный)"""
+    data = await state.get_data()
+    current_number = data.get("current_task_number")
+
+    if not current_number:
+        await callback.answer("Нет активной задачи", show_alert=True)
+        await state.clear()
+        return
+
+    task = TaskService.get_task_by_number(int(current_number))
+    if not task:
+        await callback.answer("Задача не найдена", show_alert=True)
+        await state.clear()
+        return
+
+    await TaskProgressService.log_attempt(
+        user=user,
+        task=task,
+        status=TaskProgressService.STATUS_INCORRECT,
+        user_answer="(показан ответ)",
+        is_correct=False,
+    )
+
+    await callback.answer("Ответ показан")
+    await callback.message.answer(f"Ответ на задачу #{task.number}: {task.answer}")
 
     next_task = _get_next_task(task.number)
     if not next_task:

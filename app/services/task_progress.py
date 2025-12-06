@@ -1,7 +1,9 @@
 """
-Сервис для записи результатов решения задач
+Сервис для записи результатов решения задач и статистики
 """
-from typing import Optional
+from typing import Optional, List
+
+from tortoise.functions import Count
 
 from app.models import TaskAttempt, User
 from app.services.tasks import Task
@@ -69,3 +71,73 @@ class TaskProgressService:
         )
         return last_attempt.task_number if last_attempt else 0
 
+    @staticmethod
+    async def get_user_stats(user: User) -> dict:
+        """Персональная статистика пользователя"""
+        total = await TaskAttempt.filter(user=user).count()
+        correct = await TaskAttempt.filter(user=user, status=TaskProgressService.STATUS_CORRECT).count()
+        incorrect = await TaskAttempt.filter(user=user, status=TaskProgressService.STATUS_INCORRECT).count()
+        skipped = await TaskAttempt.filter(user=user, status=TaskProgressService.STATUS_SKIPPED).count()
+
+        accuracy = round((correct / total) * 100, 1) if total else 0.0
+
+        return {
+            "total": total,
+            "correct": correct,
+            "incorrect": incorrect,
+            "skipped": skipped,
+            "accuracy": accuracy,
+        }
+
+    @staticmethod
+    async def get_leaderboard(limit: int = 10) -> List[dict]:
+        """Глобальный топ по числу верных задач"""
+        rows = (
+            await TaskAttempt.filter(status=TaskProgressService.STATUS_CORRECT)
+            .annotate(correct_count=Count("id"))
+            .group_by("user_id")
+            .order_by("-correct_count")
+            .limit(limit)
+            .values("user_id", "correct_count")
+        )
+        user_ids = [row["user_id"] for row in rows]
+        users = await User.filter(id__in=user_ids)
+        users_map = {u.id: u for u in users}
+
+        leaderboard = []
+        for idx, row in enumerate(rows, start=1):
+            user = users_map.get(row["user_id"])
+            leaderboard.append(
+                {
+                    "place": idx,
+                    "user": user,
+                    "correct": row["correct_count"],
+                }
+            )
+        return leaderboard
+
+    @staticmethod
+    async def get_task_stats(task_number: int) -> dict:
+        """Статистика по конкретной задаче"""
+        total = await TaskAttempt.filter(task_number=task_number).count()
+        correct = await TaskAttempt.filter(
+            task_number=task_number,
+            status=TaskProgressService.STATUS_CORRECT
+        ).count()
+        incorrect = await TaskAttempt.filter(
+            task_number=task_number,
+            status=TaskProgressService.STATUS_INCORRECT
+        ).count()
+        skipped = await TaskAttempt.filter(
+            task_number=task_number,
+            status=TaskProgressService.STATUS_SKIPPED
+        ).count()
+        accuracy = round((correct / total) * 100, 1) if total else 0.0
+
+        return {
+            "total": total,
+            "correct": correct,
+            "incorrect": incorrect,
+            "skipped": skipped,
+            "accuracy": accuracy,
+        }

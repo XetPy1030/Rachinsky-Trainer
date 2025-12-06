@@ -10,7 +10,7 @@ from tortoise import Tortoise
 from app.config import tortoise_config
 from app.instances import dp, bot
 from app.middlewares.auth import AuthMiddleware
-from app.services.notifiers import notify_about_startup
+from app.services import notify_about_startup, set_bot_commands
 from app.utils.logger import setup_logger, get_logger
 
 load_dotenv()
@@ -31,6 +31,8 @@ async def main():
 
     from app.handlers import router
     dp.include_router(router)
+
+    await set_bot_commands()
 
     logger.info("Уведомление администраторам о запуск...")
     await notify_about_startup()
