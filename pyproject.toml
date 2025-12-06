@@ -1,0 +1,20 @@
+[project]
+name = "rachinskiybot"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = ["aiogram (>=3.22.0,<4.0.0)", "python-dotenv (>=1.2.1,<2.0.0)", "aerich (>=0.9.2,<0.10.0)", "pydantic (>=2.11.0,<3.0.0)", "pydantic-settings (>=2.12.0,<3.0.0)", "psycopg2-binary (>=2.9.11,<3.0.0)", "loguru (>=0.7.3,<0.8.0)", "tortoise-orm[asyncpg] (>=0.25.1,<0.26.0)", "pytz (>=2025.2,<2026.0)", "tomlkit (>=0.13.3,<0.14.0)", "redis (>=7.1.0,<8.0.0)"]
+
+[[project.authors]]
+name = "XetPy1030"
+email = "xetpy1030@mail.ru"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.aerich]
+tortoise_orm = "app.config.tortoise_config"
+location = "./app/migrations"
+src_folder = "./."
