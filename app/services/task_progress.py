@@ -7,7 +7,10 @@ from tortoise.functions import Count
 
 from app.models import TaskAttempt, User
 from app.services.tasks import Task
+from app.utils.dt import get_current_dt
+from app.instances import current_timezone
 from app.utils.logger import get_logger
+from datetime import UTC
 
 logger = get_logger(__name__)
 
@@ -87,6 +90,25 @@ class TaskProgressService:
             "incorrect": incorrect,
             "skipped": skipped,
             "accuracy": accuracy,
+        }
+
+    @staticmethod
+    async def get_user_today_counts(user: User) -> dict:
+        """Статистика за сегодняшний день"""
+        now_local = get_current_dt().astimezone(current_timezone)
+        start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_utc = start_local.astimezone(UTC)
+
+        today_qs = TaskAttempt.filter(user=user, created_at__gte=start_utc)
+        total = await today_qs.count()
+        correct = await today_qs.filter(status=TaskProgressService.STATUS_CORRECT).count()
+        incorrect = await today_qs.filter(status=TaskProgressService.STATUS_INCORRECT).count()
+        skipped = await today_qs.filter(status=TaskProgressService.STATUS_SKIPPED).count()
+        return {
+            "total": total,
+            "correct": correct,
+            "incorrect": incorrect,
+            "skipped": skipped,
         }
 
     @staticmethod
